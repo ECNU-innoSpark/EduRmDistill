@@ -1,0 +1,71 @@
+# ==========================================
+# 黑盒蒸馏脚手架 基础配置 (config.yaml)
+# ==========================================
+
+# 全局配置
+output_dir: "./workspace/outputs" # 所有生成数据和模型权重的输出目录
+
+# ------------------------------------------
+# 1. 数据配置 (Data)
+# ------------------------------------------
+data:
+  # 提示词数据，可以为多轮对话格式，脚手架会自动处理成适合模型输入的格式
+  # 每一行应该是一个 JSON 对象
+  # 对于文本补全任务，JSON对象应该包含一个 "text" 字段，类型为字符串；
+  # 对于对话补全任务，JSON对象应该包含一个 "messages" 字段，格式为 [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]。
+  input_path: "./data/raw_prompts.jsonl"
+  # Teacher 生成后的训练集存放路径
+  dataset_path: "./data/distilled_data.jsonl"
+  # 可选的系统提示，仅在input_path为对话补全时有效
+  # 系统提示会被添加到每个**缺少**system prompt的数据中
+  # 如果某条数据已经包含system prompt，则以数据中的为准
+  system_prompt: "你是一个专业的编程助手，帮助用户解答编程相关的问题。"
+  # 可选的输入模板，仅在input_path为文本补全时有效，{text}会被替换成原始输入
+  prompt_template: "身为一名专业程序员，我觉得下面的代码更符合你的需求：\n{text}" # 模板
+
+# ------------------------------------------
+# 2. 老师模型配置 (Teacher / Black-Box)
+# ------------------------------------------
+teacher:
+  provider: "openai" # 暂时仅支持openai
+  model: "gpt-4o" # 调用的具体模型版本
+  api_key: "ENV:OPENAI_API_KEY" # 推荐使用 ENV: 前缀从环境变量读取，避免密钥泄露
+  base_url: "https://api.openai.com/v1" # 方便国内代理或接入 vLLM 等本地服务
+  generation_params:
+    # 这些内容将被直接透传
+    temperature: 0.7
+    max_tokens: 2048
+  # 教师模型请求配置，主要控制并发和重试策略，提升生成效率和稳定性
+  request_config:
+    max_workers: 10 # 并发请求数，提升生成效率
+    max_retries: 3 # 网络错误或被频控时的重试次数
+    timeout: 60 # 单次请求超时时间（秒）
+
+# ------------------------------------------
+# 3. 学生模型配置 (Student)
+# ------------------------------------------
+student:
+  base_model: "Qwen/Qwen2.5-1.5B" # HuggingFace 模型路径或本地路径
+  model_type: "causal_lm" # 模型类型
+  use_lora: true # 是否使用 LoRA 微调，如果为 false 则进行全参数微调
+  lora_config: # LoRA 配置，在 use_lora 为 true 时必填
+    r: 16
+    alpha: 32
+    target_modules: ["q_proj", "v_proj"] # 如果留空，脚手架可以尝试自动推断
+
+# ------------------------------------------
+# 4. 训练超参 (Training)
+# ------------------------------------------
+training:
+  num_train_epochs: 3
+  learning_rate: 2.0e-5
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 2
+  max_seq_length: 2048 # 截断长度
+  dtype: "fp16" # 训练数据类型，支持 "fp16", "bf16", "float32" 等，具体取决于硬件和框架支持
+  logging_steps: 10
+  evaluation_strategy: "steps" # 评估策略，可以是 "no", "steps", "epoch" 等
+  eval_at: 100 # 每隔多少步/epoch在验证集上测一下 loss
+  save_strategy: "steps" # 保存策略，可以是 "steps", "epoch" 等
+  save_at: 100 # 每隔多少步/epoch保存一次 checkpoint
+  save_total_limit: 3 # 最多保留几个 checkpoint，防止硬盘撑爆

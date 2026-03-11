@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Ruff cache
+.ruff_cache
+
+# config.yaml 可能包含敏感信息，建议用户自行创建并配置
+config.yaml
+
+# generate_cache
+mimic_generate_cache/
+
+# 示例数据目录
+data/
