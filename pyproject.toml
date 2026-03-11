@@ -7,9 +7,11 @@ requires-python = ">=3.13"
 dependencies = [
     "click>=8.0.0",
     "diskcache>=5.6.3",
+    "ms-swift>=1.4.0",
     "openai>=1.0.0",
     "pydantic>=2.12.5",
     "pyyaml>=6.0.3",
+    "torch>=2.10.0",
     "transformers[torch]>=5.3.0",
 ]
 
@@ -25,6 +27,17 @@ include = ["mimic*"]
 exclude = ["data*", "scripts*"]
 
 [dependency-groups]
-dev = [
-    "datasets>=4.7.0",
+dev = ["datasets>=4.7.0"]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
 ]
