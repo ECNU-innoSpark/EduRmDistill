@@ -1,7 +1,13 @@
-# Mimic-Kit
+<div align="center">
+  <img src="assets/logo.svg" alt="Mimic-Kit Logo" width="150">
+  <h1>Mimic-Kit</h1>
+  <p><strong>让黑盒知识蒸馏变得简单</strong></p>
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+</div>
+
+---
 
 **中文** | [English](README.md)
 
@@ -80,14 +86,44 @@ uv run mimic train
 
 学生模型将使用生成数据按照配置的方法（LoRA 或全参数微调）进行微调。
 
-## 配置说明
+## 配置示例
 
-详见 `config.yaml` 中的所有选项。主要配置段：
+```yaml
+# 数据配置
+data:
+  input_path: "./data/prompts.jsonl"
+  dataset_path: "./data/distilled_data.jsonl"
+  system_prompt: "你是一个有帮助的助手。"
 
-- `data`: 输入/输出路径、系统提示词、模板
-- `teacher`: API 提供商、模型、生成参数
-- `student`: 基础模型、微调方法、超参数
-- `training`: 批次大小、学习率、保存策略
+# 教师模型（黑盒 API）
+teacher:
+  provider: "openai"
+  model: "gpt-4o"
+  api_key: "sk-..."
+  base_url: "https://api.openai.com/v1"
+  generation_params:
+    temperature: 0.7
+    max_tokens: 2048
+
+# 学生模型（开源大模型）
+student:
+  base_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  tuner_type: "lora"  # 或 "full" 全参数微调
+  lora_config:
+    rank: 8
+    alpha: 32
+
+# 训练配置
+training:
+  epochs: 3
+  per_device_train_batch_size: 4
+  learning_rate:
+    initial: 1e-4
+  saving:
+    output_dir: "./outputs"
+```
+
+详见 `config.yaml` 中的所有选项。
 
 ## 项目结构
 
@@ -103,6 +139,14 @@ mimic-kit/
 └── output/                 # 模型输出和检查点
 ```
 
+## CLI 命令
+
+| 命令 | 说明 |
+|------|------|
+| `mimic init` | 创建 `config.yaml` 模板 |
+| `mimic generate` | 使用教师模型生成训练数据 |
+| `mimic train` | 使用 ms-swift 训练学生模型 |
+
 ## 环境要求
 
 - Python 3.13+
@@ -112,17 +156,17 @@ mimic-kit/
 ## 开发
 
 ```bash
-# 运行测试
-uv run pytest
-
-# 运行单个测试
-uv run pytest tests/test_cli.py::test_function
+# 安装开发依赖
+uv sync --group dev
 
 # 格式化代码
 uv run ruff format .
 
 # 检查代码规范
-uv run ruff check .
+uv run ruff check . --fix
+
+# 类型检查
+uv run mypy mimic/
 ```
 
 ## 许可证

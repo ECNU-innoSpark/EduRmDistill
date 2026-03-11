@@ -1,7 +1,13 @@
-# Mimic-Kit
+<div align="center">
+  <img src="assets/logo.svg" alt="Mimic-Kit Logo" width="150">
+  <h1>Mimic-Kit</h1>
+  <p><strong>Black-Box Knowledge Distillation Made Simple</strong></p>
 
-[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+  [![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+</div>
+
+---
 
 [中文文档](README-ZH.md) | **English**
 
@@ -80,14 +86,44 @@ uv run mimic train
 
 The student model will be fine-tuned on the generated data using the configured method (LoRA or full fine-tuning).
 
-## Configuration
+## Configuration Example
 
-See `config.yaml` for all available options. Key sections:
+```yaml
+# Data
+data:
+  input_path: "./data/prompts.jsonl"
+  dataset_path: "./data/distilled_data.jsonl"
+  system_prompt: "You are a helpful assistant."
 
-- `data`: Input/output paths, system prompts, templates
-- `teacher`: API provider, model, generation parameters
-- `student`: Base model, tuning method, hyperparameters
-- `training`: Batch size, learning rate, saving strategy
+# Teacher (Black-Box API)
+teacher:
+  provider: "openai"
+  model: "gpt-4o"
+  api_key: "sk-..."
+  base_url: "https://api.openai.com/v1"
+  generation_params:
+    temperature: 0.7
+    max_tokens: 2048
+
+# Student (Open Source LLM)
+student:
+  base_model: "Qwen/Qwen2.5-1.5B-Instruct"
+  tuner_type: "lora"  # or "full"
+  lora_config:
+    rank: 8
+    alpha: 32
+
+# Training
+training:
+  epochs: 3
+  per_device_train_batch_size: 4
+  learning_rate:
+    initial: 1e-4
+  saving:
+    output_dir: "./outputs"
+```
+
+See `config.yaml` for all available options.
 
 ## Project Structure
 
@@ -103,6 +139,14 @@ mimic-kit/
 └── output/                 # Model outputs and checkpoints
 ```
 
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `mimic init` | Create `config.yaml` template |
+| `mimic generate` | Generate training data from teacher model |
+| `mimic train` | Train student model with ms-swift |
+
 ## Requirements
 
 - Python 3.13+
@@ -112,17 +156,17 @@ mimic-kit/
 ## Development
 
 ```bash
-# Run tests
-uv run pytest
-
-# Run single test
-uv run pytest tests/test_cli.py::test_function
+# Install dev dependencies
+uv sync --group dev
 
 # Format code
 uv run ruff format .
 
 # Check linting
-uv run ruff check .
+uv run ruff check . --fix
+
+# Type checking
+uv run mypy mimic/
 ```
 
 ## License
