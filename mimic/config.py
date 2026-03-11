@@ -6,7 +6,7 @@ config.yaml files used in the black-box distillation scaffolding.
 
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Literal, Optional
 
 import yaml
 from pydantic import BaseModel, Field, field_validator
@@ -76,11 +76,23 @@ class TeacherConfig(BaseModel):
 class LoRAConfig(BaseModel):
     """LoRA (Low-Rank Adaptation) configuration."""
 
-    r: int = Field(default=16, gt=0, description="LoRA rank")
+    rank: int = Field(default=8, gt=0, description="LoRA rank")
     alpha: int = Field(default=32, gt=0, description="LoRA alpha")
     target_modules: List[str] = Field(
-        default_factory=lambda: ["q_proj", "v_proj"],
+        default_factory=lambda: ["all-linear"],
         description="Target modules for LoRA adaptation",
+    )
+
+
+class FullConfig(BaseModel):
+    """Full fine-tuning configuration."""
+
+    packing: bool = Field(default=True, description="Whether to use parameter packing")
+    deepspeed: Optional[str] = Field(
+        default=None, description="DeepSpeed ZeRO optimization level"
+    )
+    use_liger_kernel: bool = Field(
+        default=True, description="Whether to use Liger Kernel for acceleration"
     )
 
 
@@ -88,10 +100,15 @@ class StudentConfig(BaseModel):
     """Configuration for the student model training."""
 
     base_model: str = Field(description="HuggingFace model path or local path")
-    model_type: str = Field(default="causal_lm", description="Model architecture type")
-    use_lora: bool = Field(default=True, description="Whether to use LoRA fine-tuning")
+    tuner_type: Literal["lora", "full"] = Field(
+        default="lora", description="Fine-tuning method: lora or full"
+    )
     lora_config: Optional[LoRAConfig] = Field(
-        default=None, description="LoRA configuration (required if use_lora=True)"
+        default=None, description="LoRA configuration (used when tuner_type=lora)"
+    )
+    full_config: Optional[FullConfig] = Field(
+        default=None,
+        description="Full fine-tuning configuration (used when tuner_type=full)",
     )
 
     @field_validator("lora_config")
@@ -99,20 +116,37 @@ class StudentConfig(BaseModel):
     def validate_lora_config(
         cls, v: Optional[LoRAConfig], info: Any
     ) -> Optional[LoRAConfig]:
-        """Ensure LoRA config is provided when use_lora=True."""
-        if info.data.get("use_lora") and v is None:
+        """Ensure LoRA config is provided when tuner_type=lora."""
+        if info.data.get("tuner_type") == "lora" and v is None:
             # Use default LoRA config if not provided
             return LoRAConfig()
         return v
 
+    @field_validator("full_config")
+    @classmethod
+    def validate_full_config(
+        cls, v: Optional[FullConfig], info: Any
+    ) -> Optional[FullConfig]:
+        """Ensure Full config is provided when tuner_type=full."""
+        if info.data.get("tuner_type") == "full" and v is None:
+            # Use default Full config if not provided
+            return FullConfig()
+        return v
 
-class TrainingConfig(BaseModel):
-    """Training hyperparameters configuration."""
 
-    num_train_epochs: int = Field(
-        default=3, gt=0, description="Number of training epochs"
+class TrainingRunConfig(BaseModel):
+    """Training runtime configuration."""
+
+    tp: int = Field(default=1, ge=1, description="Tensor parallelism degree")
+    dtype: str = Field(
+        default="bf16",
+        pattern="^(fp16|bf16|float32)$",
+        description="Training data type",
     )
-    learning_rate: float = Field(default=2.0e-5, gt=0, description="Learning rate")
+    logging_steps: int = Field(
+        default=10, gt=0, description="Logging frequency in steps"
+    )
+    epochs: int = Field(default=3, gt=0, description="Number of training epochs")
     per_device_train_batch_size: int = Field(
         default=4, gt=0, description="Batch size per device"
     )
@@ -120,34 +154,60 @@ class TrainingConfig(BaseModel):
         default=2, ge=1, description="Gradient accumulation steps"
     )
     max_seq_length: int = Field(
-        default=2048, gt=0, description="Maximum sequence length"
+        default=2048, gt=0, description="Maximum sequence length (truncation length)"
     )
-    dtype: str = Field(
-        default="fp16",
-        pattern="^(fp16|bf16|float32)$",
-        description="Training data type",
+    split_ratio: float = Field(
+        default=0.1, ge=0.0, le=1.0, description="Validation split ratio"
     )
-    logging_steps: int = Field(
-        default=10, gt=0, description="Logging frequency in steps"
+
+
+class LearningRateConfig(BaseModel):
+    """Learning rate configuration."""
+
+    initial: float = Field(default=1e-4, gt=0, description="Initial learning rate")
+    warmup_fraction: float = Field(
+        default=0.05, ge=0.0, le=1.0, description="Learning rate warmup fraction"
     )
-    evaluation_strategy: str = Field(
-        default="steps",
-        pattern="^(no|steps|epoch)$",
-        description="Evaluation strategy: no, steps, or epoch",
+    minimum: float = Field(default=1e-5, gt=0, description="Minimum learning rate")
+
+
+class EvaluationConfig(BaseModel):
+    """Evaluation configuration."""
+
+    strategy: Literal["no", "steps", "epoch"] = Field(
+        default="steps", description="Evaluation strategy"
     )
-    eval_at: int = Field(default=100, gt=0, description="Evaluate every N steps/epochs")
-    save_strategy: str = Field(
-        default="steps",
-        pattern="^(steps|epoch)$",
-        description="Checkpoint save strategy: steps or epoch",
+    at: int = Field(default=100, gt=0, description="Evaluate every N steps/epochs")
+
+
+class SavingConfig(BaseModel):
+    """Checkpoint saving configuration."""
+
+    strategy: Literal["steps", "epoch"] = Field(
+        default="steps", description="Checkpoint save strategy"
     )
-    save_at: int = Field(
+    at: int = Field(
         default=100, gt=0, description="Save checkpoint every N steps/epochs"
     )
-    save_total_limit: int = Field(
-        default=3,
-        ge=1,
-        description="Maximum number of checkpoints to keep",
+    total_limit: int = Field(
+        default=3, ge=1, description="Maximum number of checkpoints to keep"
+    )
+
+
+class TrainingConfig(BaseModel):
+    """Training hyperparameters configuration."""
+
+    run: TrainingRunConfig = Field(
+        default_factory=TrainingRunConfig, description="Training runtime configuration"
+    )
+    learning_rate: LearningRateConfig = Field(
+        default_factory=LearningRateConfig, description="Learning rate configuration"
+    )
+    evaluation: EvaluationConfig = Field(
+        default_factory=EvaluationConfig, description="Evaluation configuration"
+    )
+    saving: SavingConfig = Field(
+        default_factory=SavingConfig, description="Checkpoint saving configuration"
     )
 
 

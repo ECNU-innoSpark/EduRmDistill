@@ -6,7 +6,7 @@ DATA = Path(__file__).parent.parent / "data"
 DATA.mkdir(exist_ok=True)  # 确保 data 目录存在
 
 # 以 Alpaca 为例，只取前 500 条
-ds = load_dataset("yahma/alpaca-cleaned", split="train[:10]")
+ds = load_dataset("yahma/alpaca-cleaned", split="train[:100]")
 
 with open(DATA / "raw_prompts.jsonl", "w", encoding="utf-8") as f:
     for item in ds:
