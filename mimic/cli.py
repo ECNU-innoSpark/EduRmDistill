@@ -1,10 +1,13 @@
 """CLI commands for mimic."""
 
+from pathlib import Path
+
 import click
 from mimic import __version__
 from mimic.config import load_config
 from mimic.generator import generate_dataset, save_dataset
 from mimic.templates import write_config_template
+from mimic.trainer import train_with_swift
 
 
 @click.group()
@@ -58,6 +61,50 @@ def generate(config):
 
     except FileNotFoundError as e:
         click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except Exception as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@cli.command()
+@click.option(
+    "--config",
+    "-c",
+    default="config.yaml",
+    help="Path to configuration file (default: config.yaml)",
+)
+def train(config):
+    """Train student model using ms-swift"""
+    try:
+        # Load configuration
+        cfg = load_config(config)
+        click.echo(f"Loaded configuration from {config}")
+
+        # Check if dataset exists
+        dataset_path = Path(cfg.data.dataset_path)
+        if not dataset_path.exists():
+            click.echo(
+                f"Error: Dataset not found at {dataset_path}. "
+                "Run 'mimic generate' first.",
+                err=True,
+            )
+            raise click.Abort()
+
+        click.echo(f"Starting training with ms-swift...")
+        click.echo(f"Base model: {cfg.student.base_model}")
+        click.echo(f"Dataset: {cfg.data.dataset_path}")
+
+        # Run training
+        train_with_swift(cfg)
+
+        click.echo("Training completed successfully!")
+
+    except FileNotFoundError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+    except RuntimeError as e:
+        click.echo(f"Training error: {e}", err=True)
         raise click.Abort()
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
