@@ -82,4 +82,4 @@ training:
     strategy: "steps" # 保存策略，可以是 "steps", "epoch" 等
     at: 100 # 每隔多少步/epoch保存一次 checkpoint
     total_limit: 3 # 最多保留几个 checkpoint，防止硬盘撑爆
-    output_dir: "./workspace/outputs" # 所有生成数据和模型权重的输出目录
+    output_dir: "./output" # 所有生成数据和模型权重的输出目录

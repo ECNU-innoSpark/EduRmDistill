@@ -20,3 +20,9 @@ mimic_generate_cache/
 
 # 示例数据目录
 data/
+
+# VSCODE 配置目录
+.vscode
+
+# output
+output/
