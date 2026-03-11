@@ -20,6 +20,8 @@ data:
   # 系统提示会被添加到每个**缺少**system prompt的数据中
   # 如果某条数据已经包含system prompt，则以数据中的为准
   system_prompt: "你是一个专业的编程助手，帮助用户解答编程相关的问题。"
+  # 可选的替换系统提示，仅在input_path为对话补全时有效，且会覆盖数据中的system prompt，适合需要统一系统提示的场景
+  train_system_prompt: "Orz" 
   # 可选的输入模板，仅在input_path为文本补全时有效，{text}会被替换成原始输入
   prompt_template: "身为一名专业程序员，我觉得下面的代码更符合你的需求：\n{text}" # 模板
 

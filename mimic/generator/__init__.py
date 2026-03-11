@@ -69,6 +69,9 @@ def generate_dataset(
                     try:
                         response = future.result()
                         r = item
+                        if config.data.train_system_prompt:
+                            if r and r[0]["role"] == "system":  # pyright: ignore[reportArgumentType]
+                                r[0]["content"] = config.data.train_system_prompt  # pyright: ignore[reportIndexIssue]
                         r.append(  # pyright: ignore[reportAttributeAccessIssue]
                             {
                                 "role": "assistant",

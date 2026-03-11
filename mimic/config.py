@@ -20,6 +20,10 @@ class DataConfig(BaseModel):
     system_prompt: Optional[str] = Field(
         default=None, description="Optional system prompt for chat completions"
     )
+    train_system_prompt: Optional[str] = Field(
+        default=None,
+        description="Optional system prompt to override data's system prompt during training (only for chat format)",
+    )
     prompt_template: Optional[str] = Field(
         default=None, description="Template for text completions, {text} placeholder"
     )
