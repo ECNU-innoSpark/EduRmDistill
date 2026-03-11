@@ -2,9 +2,6 @@
 # 黑盒蒸馏脚手架 基础配置 (config.yaml)
 # ==========================================
 
-# 全局配置
-output_dir: "./workspace/outputs" # 所有生成数据和模型权重的输出目录
-
 # ------------------------------------------
 # 1. 数据配置 (Data)
 # ------------------------------------------
@@ -48,13 +45,14 @@ teacher:
 # ------------------------------------------
 student:
   base_model: "Qwen/Qwen2.5-1.5B" # HuggingFace 模型路径或本地路径
+  use_hf: false # 是否从 Hugging Face Hub 加载模型，默认为 false 表示从 ModelScope 加载
   tuner_type: "lora" # 微调方法，支持 "lora" 和 "full"（全参数微调）
+  target_modules: ["all-linear"] # 默认为所有线性层
   lora_config: # LoRA 配置，在 use_lora 为 true 时必填
     rank: 8
     alpha: 32
-    target_modules: ["all-linear"] # 默认为所有线性层
   full_config: # 全参数微调配置，在 tuner_type 为 "full" 时必填
-    packing: true # 是否使用参数打包，减少显存占用
+    packing: true # 是否使用参数打包，减少显存占用，需要flash_attention支持
     deepspeed: "zero2" # 是否使用 DeepSpeed ZeRO 优化
     use_liger_kernel: true # 是否使用 Liger Kernel 加速训练
     
@@ -67,18 +65,16 @@ student:
 training:
   run:
     tp: 1 # 张量并行度，默认为1表示不使用张量并行
-    dtype: "bf16" # 训练数据类型，支持 "fp16", "bf16", "float32" 等，具体取决于硬件和框架支持
+    dtype: "bfloat16" # 训练数据类型，支持 "float16", "bfloat16", "float32" 等，具体取决于硬件和框架支持
     logging_steps: 10
     epochs: 3
     per_device_train_batch_size: 4
-    per_device_train_batch_size: 1
     gradient_accumulation_steps: 2
     max_seq_length: 2048 # 截断长度
     split_ratio: 0.1 # 从训练集中划分一部分作为验证集，比例为10%
   learning_rate:
     initial: 1e-4
     warmup_fraction: 0.05 # 学习率预热比例
-    minimum: 1e-5 # 最小学习率，适用于学习率调度器
   evaluation:
     strategy: "steps" # 评估策略，可以是 "no", "steps", "epoch" 等
     at: 100 # 每隔多少步/epoch在验证集上测一下 loss
@@ -86,3 +82,4 @@ training:
     strategy: "steps" # 保存策略，可以是 "steps", "epoch" 等
     at: 100 # 每隔多少步/epoch保存一次 checkpoint
     total_limit: 3 # 最多保留几个 checkpoint，防止硬盘撑爆
+    output_dir: "./workspace/outputs" # 所有生成数据和模型权重的输出目录
