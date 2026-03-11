@@ -78,10 +78,6 @@ class LoRAConfig(BaseModel):
 
     rank: int = Field(default=8, gt=0, description="LoRA rank")
     alpha: int = Field(default=32, gt=0, description="LoRA alpha")
-    target_modules: List[str] = Field(
-        default_factory=lambda: ["all-linear"],
-        description="Target modules for LoRA adaptation",
-    )
 
 
 class FullConfig(BaseModel):
@@ -100,6 +96,10 @@ class StudentConfig(BaseModel):
     """Configuration for the student model training."""
 
     base_model: str = Field(description="HuggingFace model path or local path")
+    use_hf: bool = Field(
+        default=False,
+        description="Whether to load the model from Hugging Face Hub (default: false, load from ModelScope)",
+    )
     tuner_type: Literal["lora", "full"] = Field(
         default="lora", description="Fine-tuning method: lora or full"
     )
@@ -109,6 +109,10 @@ class StudentConfig(BaseModel):
     full_config: Optional[FullConfig] = Field(
         default=None,
         description="Full fine-tuning configuration (used when tuner_type=full)",
+    )
+    target_modules: List[str] = Field(
+        default_factory=lambda: ["all-linear"],
+        description="Target modules for tuning (applicable for both LoRA and full fine-tuning), options include 'all-linear', 'q_proj', 'k_proj', 'v_proj'.",
     )
 
     @field_validator("lora_config")
@@ -139,8 +143,8 @@ class TrainingRunConfig(BaseModel):
 
     tp: int = Field(default=1, ge=1, description="Tensor parallelism degree")
     dtype: str = Field(
-        default="bf16",
-        pattern="^(fp16|bf16|float32)$",
+        default="bfloat16",
+        pattern="^(float16|bfloat16|float32)$",
         description="Training data type",
     )
     logging_steps: int = Field(
@@ -168,7 +172,6 @@ class LearningRateConfig(BaseModel):
     warmup_fraction: float = Field(
         default=0.05, ge=0.0, le=1.0, description="Learning rate warmup fraction"
     )
-    minimum: float = Field(default=1e-5, gt=0, description="Minimum learning rate")
 
 
 class EvaluationConfig(BaseModel):
@@ -192,6 +195,18 @@ class SavingConfig(BaseModel):
     total_limit: int = Field(
         default=3, ge=1, description="Maximum number of checkpoints to keep"
     )
+    output_dir: str = Field(
+        default="./workspace/outputs",
+        description="Directory to save checkpoints and outputs",
+    )
+
+    @field_validator("output_dir")
+    @classmethod
+    def validate_output_dir(cls, v: str) -> str:
+        """Ensure output directory path is valid."""
+        path = Path(v)
+        # Expand user directory if needed
+        return str(path.expanduser())
 
 
 class TrainingConfig(BaseModel):
@@ -217,25 +232,12 @@ class MimicConfig(BaseModel):
     This class represents the complete configuration for the
     black-box distillation scaffolding system.
     """
-
-    output_dir: str = Field(
-        default="./workspace/outputs",
-        description="Output directory for all generated data and model weights",
-    )
     data: DataConfig = Field(description="Data processing configuration")
     teacher: TeacherConfig = Field(
         description="Teacher (black-box) model configuration"
     )
     student: StudentConfig = Field(description="Student model configuration")
     training: TrainingConfig = Field(description="Training hyperparameters")
-
-    @field_validator("output_dir")
-    @classmethod
-    def validate_output_dir(cls, v: str) -> str:
-        """Ensure output directory path is valid."""
-        path = Path(v)
-        # Expand user directory if needed
-        return str(path.expanduser())
 
     @classmethod
     def from_yaml(cls, path: str | Path) -> "MimicConfig":
